@@ -1,0 +1,13 @@
+{
+  "name"       : "klipkens/ZipStreamer",
+  "description": "Stream zipped data while adding files",
+  "license"    : "MIT License",
+  "require"    : {
+    "php": ">=5.4.2"
+  },
+  "autoload"   : {
+    "psr-4": {
+      "ZipStreamer\\": "src"
+    }
+  }
+}
