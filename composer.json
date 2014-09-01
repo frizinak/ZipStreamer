@@ -1,5 +1,5 @@
 {
-  "name"       : "klipkens/ZipStreamer",
+  "name"       : "klipkens/zip-streamer",
   "description": "Stream zipped data while adding files",
   "license"    : "MIT License",
   "require"    : {
