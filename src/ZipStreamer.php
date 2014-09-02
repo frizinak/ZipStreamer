@@ -102,16 +102,22 @@ class ZipStreamer {
     }
 
     $file = $this->files[$this->sent];
-    // Add default properties and calculate deflatedSize & crc if not deflated and not continuous.
-    $this->prepare($file);
-    $local = $file->genLocal(self::ZIP_VERSION, $this->dosStamp);
 
+    // Local header
+    $local = $file->genLocal(self::ZIP_VERSION, $this->dosStamp);
     $this->output($local);
+
+    // Body
     $file->hasDeflation() ? $this->outputDeflated($file) : $this->outputRaw($file);
 
-    $file->setLocalOffset($this->localOffset);
-    $this->localOffset += strlen($local) + $file->getDeflatedSize();
+    // Data descriptor
+    $dataDescriptor = $file->isSmooth() ? $file->genDataDescriptor() : '';
+    $this->output($dataDescriptor);
 
+    $file->setLocalOffset($this->localOffset);
+    $this->localOffset += strlen($local) + $file->getDeflatedSize() + strlen($dataDescriptor);
+
+    // Central header (not output, see flush)
     $file->genCentral(self::ZIP_VERSION, $this->dosStamp);
     $this->centralLength += strlen($file->getCentral());
 
@@ -138,31 +144,23 @@ class ZipStreamer {
   /**
    * @param File $file
    *
-   * Prepare the data required for the file header.
-   * size, deflatedSize, crc32, ...
-   */
-  protected function prepare(File $file) {
-    $path = $file->getPath();
-    $fstat = stat($path);
-    $file->setSize($fstat['size']);
-    if (!$file->isSmooth()) $file->setRawCrc(hash_file('crc32b', $path, TRUE));
-    if (!$file->hasDeflation()) $file->setDeflatedSize($file->getSize());
-  }
-
-  /**
-   * @param File $file
-   *
    * Send the raw file to the output interface (chunked by blockSize).
    */
   protected function outputRaw(File $file) {
     $fh = fopen($file->getPath(), 'rb');
     $crc = $file->isSmooth() ? hash_init('crc32b') : FALSE;
+    $size = 0;
     while (TRUE) {
       $data = fread($fh, $this->blockSize);
-      if ($data === FALSE || strlen($data) == 0) break;
+      $chunkLength = $data === FALSE ? 0 : strlen($data);
+      if ($chunkLength == 0) break;
+      $size += $chunkLength;
       $crc && hash_update($crc, $data);
       $this->output($data);
     }
+
+    $file->setSize($size);
+    $file->setDeflatedSize($size);
 
     if ($crc) $file->setRawCrc(hash_final($crc, TRUE));
     fclose($fh);
@@ -173,6 +171,9 @@ class ZipStreamer {
    *
    * Send the deflated file to the output interface (chunked by blockSize),
    * And append the Extended local headers.
+   *
+   * TODO Find a way to read the file once and get both the raw and deflated data.
+   * TODO If the above proves impossible and in case of isRemote, download to temp dir or a tmp stream.
    */
   protected function outputDeflated(File $file) {
     $crc = $file->isSmooth() ? hash_init('crc32b') : FALSE;
@@ -182,9 +183,9 @@ class ZipStreamer {
 
     $deflationFilter = stream_filter_append($deflatedHandle, 'zlib.deflate', STREAM_FILTER_READ, array('level' => $file->getDeflationLevel()));
 
-    $rawHandle = $crc ? fopen($path, 'rb') : FALSE;
+    $rawHandle = $crc || $file->isRemote() ? fopen($path, 'rb') : FALSE;
 
-    $deflatedSize = 0;
+    $rawSize = $deflatedSize = 0;
 
     while (TRUE) {
       $deflated = fread($deflatedHandle, $this->blockSize);
@@ -194,12 +195,13 @@ class ZipStreamer {
       $deflatedLen = $deflated === FALSE ? 0 : strlen($deflated);
 
       if ($deflatedLen) {
-        $deflatedSize += strlen($deflated);
+        $deflatedSize += $deflatedLen;
         $this->output($deflated);
       }
 
       if ($rawLen) {
-        hash_update($crc, $raw);
+        $rawSize += $rawLen;
+        $crc && hash_update($crc, $raw);
       }
 
       if (!$deflatedLen && !$rawLen) {
@@ -213,17 +215,8 @@ class ZipStreamer {
 
     if ($crc) $file->setRawCrc(hash_final($crc, TRUE));
 
-    $extra = pack(
-      'VVVV',
-      0x08074b50,
-      $file->getCrc(),
-      $deflatedSize,
-      $file->getSize()
-    );
-
-    $deflatedSize += strlen($extra);
+    $file->setSize($rawSize);
     $file->setDeflatedSize($deflatedSize);
-    $this->output($extra);
   }
 
   protected function output($data) {

@@ -58,14 +58,21 @@ class File {
    */
   protected $crc = 0;
 
+  /**
+   * @var bool
+   */
+  protected $remote = FALSE;
+
   public function __construct($path, $dest, $deflationLevel = 0, $smooth = 1) {
     $this->setPath($path);
     $this->setDest($dest);
     $this->setSmooth($smooth);
     $this->setDeflationLevel($deflationLevel);
+    $this->setRemote(preg_match('/^https?:\/\//', $this->getPath()));
   }
 
   public function genLocal($zipVersion, $dosStamp) {
+    $this->prepareLocal();
     $this->local = pack(
       'VvvvVVVVvv',
       0x04034b50,                                             // Signature
@@ -107,6 +114,34 @@ class File {
 
     $this->central .= $this->dest;
     return $this->central;
+  }
+
+  public function genDataDescriptor() {
+    return pack(
+      'VVVV',
+      0x08074b50,
+      $this->getCrc(),
+      $this->getDeflatedSize(),
+      $this->getSize()
+    );
+  }
+
+  /**
+   * Prepare the data required for the file header.
+   * size, deflatedSize, crc32, ...
+   */
+  protected function prepareLocal() {
+    // isSmooth: local header will have its general purpose bit set
+    // => empty values in local header
+    // => append data descriptor
+    if ($this->isSmooth()) return;
+
+    if (!$this->isRemote()) {
+      $size = filesize($this->path);
+      $this->setSize($size);
+      if (!$this->hasDeflation()) $this->setDeflatedSize($size);
+    }
+    $this->setRawCrc(hash_file('crc32b', $this->path, TRUE));
   }
 
   /**
@@ -244,7 +279,7 @@ class File {
    * @param string $path
    */
   public function setPath($path) {
-    $this->path = $path;
+    $this->path = trim($path);
   }
 
   /**
@@ -273,6 +308,20 @@ class File {
    */
   public function setSmooth($smooth) {
     $this->smooth = $smooth;
+  }
+
+  /**
+   * @return boolean
+   */
+  public function isRemote() {
+    return $this->remote;
+  }
+
+  /**
+   * @param boolean $remote
+   */
+  public function setRemote($remote) {
+    $this->remote = $remote;
   }
 
 }
