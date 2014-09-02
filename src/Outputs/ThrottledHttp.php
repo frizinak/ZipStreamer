@@ -18,10 +18,10 @@ class ThrottledHttp extends Http implements OutputInterface {
   public function output($string) {
     if (!$this->firstCall) $this->firstCall = time();
     $diff = time() - $this->firstCall;
-    $speed = $this->dataSent / ($diff < 1 ? 1 : $diff);
+    $speed = $this->dataSent / max($diff, 1);
     if ($speed > $this->speed) {
       $sleep = $speed / $this->speed;
-      usleep(($sleep > $this->maxSleep ? $this->maxSleep : $sleep) * 1000000);
+      usleep(min($this->maxSleep, $sleep) * 1000000);
     }
     $this->dataSent += strlen($string);
     parent::output($string);
