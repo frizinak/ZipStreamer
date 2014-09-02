@@ -75,20 +75,26 @@ class ZipStreamer {
   }
 
   /**
-   * @param string $dest           Destination of the file inside the zip.
-   * @param string $path           Original file location, should be readable.
-   * @param int    $deflationLevel The zip deflate level.
-   *                               -  -1 is zlib default (at the moment of writing: 6 @see http://php.net/manual/en/filters.compression.php)
-   *                               -  0  no deflation => store
-   *                               -  1 > 9 in increasing compression strength.
+   * @param string          $dest           Destination of the file inside the zip.
+   * @param string|resource $pathOrResource Input file path or resource
+   * @param int             $deflationLevel The zip deflate level.
+   *                                        -  -1 is zlib default (at the moment of writing: 6 @see http://php.net/manual/en/filters.compression.php)
+   *                                        -  0  no deflation => store
+   *                                        -  1 > 9 in increasing compression strength.
    *
    * @throws \RuntimeException when the file does not exist.
    */
-  public function add($dest, $path, $deflationLevel = 0) {
-    if (!file_exists($path)) {
-      throw new \RuntimeException(sprintf('File %s does not exist', $path));
+  public function add($dest, $pathOrResource, $deflationLevel = 0) {
+    if (is_resource($pathOrResource)) {
+      $meta = stream_get_meta_data($pathOrResource);
+      if (!isset($meta['mode']) || !strstr($meta['mode'], 'r')) {
+        throw new \RuntimeException('Resource should be readable');
+      }
     }
-    $this->files[] = new File($path, preg_replace('/^\//', '', $dest), $deflationLevel, $this->continuous);
+    else if (!is_string($pathOrResource)) {
+      throw new \RuntimeException('pathOrResource is neither a string nor a resource');
+    }
+    $this->files[] = new File($pathOrResource, preg_replace('/^\//', '', $dest), $deflationLevel, $this->continuous);
   }
 
   /**
@@ -147,7 +153,7 @@ class ZipStreamer {
    * Send the raw file to the output interface (chunked by blockSize).
    */
   protected function outputRaw(File $file) {
-    $fh = fopen($file->getPath(), 'rb');
+    $fh = $file->getFilehandle();
     $crc = $file->isSmooth() ? hash_init('crc32b') : FALSE;
     $size = 0;
     while (TRUE) {
@@ -173,45 +179,39 @@ class ZipStreamer {
    * And append the Extended local headers.
    *
    * TODO Find a way to read the file once and get both the raw and deflated data.
-   * TODO If the above proves impossible and in case of isRemote, download to temp dir or a tmp stream.
    */
   protected function outputDeflated(File $file) {
     $crc = $file->isSmooth() ? hash_init('crc32b') : FALSE;
-
-    $path = $file->getPath();
-    $deflatedHandle = fopen($path, 'rb');
-
-    $deflationFilter = stream_filter_append($deflatedHandle, 'zlib.deflate', STREAM_FILTER_READ, array('level' => $file->getDeflationLevel()));
-
-    $rawHandle = $crc || $file->isRemote() ? fopen($path, 'rb') : FALSE;
-
     $rawSize = $deflatedSize = 0;
 
+    $fh = $file->getFilehandle();
+    // Use tmpfile because php://temp and php://memory seem buggy (read: unusable) when using a stream filter.
+    // ... or my memory is corrupt.
+    $deflateHandle = tmpfile();
+    $deflationFilter = stream_filter_append($deflateHandle, 'zlib.deflate', STREAM_FILTER_READ, array('level' => $file->getDeflationLevel()));
+
+    // No output till file has been written :(
     while (TRUE) {
-      $deflated = fread($deflatedHandle, $this->blockSize);
-      $raw = $rawHandle ? fread($rawHandle, $this->blockSize) : FALSE;
-
+      $raw = fread($fh, $this->blockSize);
+      fwrite($deflateHandle, $raw);
       $rawLen = $raw === FALSE ? 0 : strlen($raw);
+      if (!$rawLen) break;
+      $rawSize += $rawLen;
+      $crc && hash_update($crc, $raw);
+    }
+
+    rewind($deflateHandle);
+    while (TRUE) {
+      $deflated = fread($deflateHandle, $this->blockSize);
       $deflatedLen = $deflated === FALSE ? 0 : strlen($deflated);
-
-      if ($deflatedLen) {
-        $deflatedSize += $deflatedLen;
-        $this->output($deflated);
-      }
-
-      if ($rawLen) {
-        $rawSize += $rawLen;
-        $crc && hash_update($crc, $raw);
-      }
-
-      if (!$deflatedLen && !$rawLen) {
-        break;
-      }
+      if (!$deflatedLen) break;
+      $deflatedSize += $deflatedLen;
+      $this->output($deflated);
     }
 
     stream_filter_remove($deflationFilter);
-    fclose($deflatedHandle);
-    $rawHandle && fclose($rawHandle);
+    fclose($deflateHandle);
+    $fh && fclose($fh);
 
     if ($crc) $file->setRawCrc(hash_final($crc, TRUE));
 

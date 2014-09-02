@@ -63,8 +63,18 @@ class File {
    */
   protected $remote = FALSE;
 
+  /**
+   * @var resource
+   */
+  protected $fh;
+
   public function __construct($path, $dest, $deflationLevel = 0, $smooth = 1) {
-    $this->setPath($path);
+    if (is_resource($path)) {
+      $this->fh = $path;
+      $smooth = 1;
+      $path = NULL;
+    }
+    isset($path) && $this->setPath($path);
     $this->setDest($dest);
     $this->setSmooth($smooth);
     $this->setDeflationLevel($deflationLevel);
@@ -124,6 +134,13 @@ class File {
       $this->getDeflatedSize(),
       $this->getSize()
     );
+  }
+
+  public function getFilehandle() {
+    if (!isset($this->fh)) {
+      $this->fh = fopen($this->path, 'rb');
+    }
+    return $this->fh;
   }
 
   /**
