@@ -10,7 +10,8 @@ class ThrottledHttp extends Http implements OutputInterface {
   protected $speed;
   protected $maxSleep;
 
-  function __construct($bytesPerSecond = 4194304, $maxSleep = 0.5) {
+  function __construct($filename = 'download', $bytesPerSecond = 4194304, $maxSleep = 0.5) {
+    parent::__construct($filename);
     $this->speed = $bytesPerSecond;
     $this->maxSleep = $maxSleep;
   }
