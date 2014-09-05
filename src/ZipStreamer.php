@@ -44,7 +44,7 @@ class ZipStreamer {
   protected $locked = FALSE;
 
   /**
-   * @var Http|OutputInterface
+   * @var OutputInterface
    */
   protected $outputter;
 
@@ -57,7 +57,7 @@ class ZipStreamer {
    *                                    - TRUE: Skip local header crc & sizes but append them to the file (Data descriptor)
    *                                    -       Results in a smoother stream and less cpu usage, overall slightly slower (I think).
    *                                    - FALSE: Calculate crc before piping the file body.
-   *                                    -        Adds 1 read of the file before any output has started.
+   *                                    -        Adds 1 read to the file before any output has started.
    *
    */
   public function __construct(OutputInterface $output = NULL, $blockSize = 1048576, $continuous = TRUE) {
