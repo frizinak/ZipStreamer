@@ -5,6 +5,11 @@ namespace ZipStreamer\Outputs;
 class Http extends Stdout implements OutputInterface {
 
   protected $headersSent = FALSE;
+  protected $fn;
+
+  public function __construct($filename = 'download') {
+    $this->fn = $filename;
+  }
 
   public function output($string) {
     if (!$this->headersSent) {
@@ -18,8 +23,7 @@ class Http extends Stdout implements OutputInterface {
       header("Content-type: application/octet-stream");
       header("Content-Transfer-Encoding: binary");
 
-//      header("Content-Type: application/zip");
-      header("Content-Disposition: attachment; filename=zip.zip");
+      header(sprintf("Content-Disposition: attachment; filename=%s.zip", $this->fn));
     }
     parent::output($string);
   }
