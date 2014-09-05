@@ -94,7 +94,7 @@ class ZipStreamer {
     else if (!is_string($pathOrResource)) {
       throw new \RuntimeException('pathOrResource is neither a string nor a resource');
     }
-    $this->files[] = new File($pathOrResource, preg_replace('/^\//', '', $dest), $deflationLevel, $this->continuous);
+    $this->files[] = new File($pathOrResource, preg_replace('/^\/+/', '', $dest), $deflationLevel, $this->continuous);
   }
 
   /**
