@@ -339,6 +339,7 @@ class File {
    */
   public function setRemote($remote) {
     $this->remote = $remote;
+    if($remote) $this->setSmooth(true);
   }
 
 }
