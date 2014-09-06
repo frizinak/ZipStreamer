@@ -265,13 +265,6 @@ class File {
   }
 
   /**
-   * @param string $central
-   */
-  public function setCentral($central) {
-    $this->central = $central . $this->dest;
-  }
-
-  /**
    * @return int
    */
   public function getLocalOffset() {
