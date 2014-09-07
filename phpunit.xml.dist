@@ -11,4 +11,10 @@
             <directory suffix=".php">src</directory>
         </whitelist>
     </filter>
+    <php>
+        <const name="WEB_SERVER_HOST" value="localhost" />
+        <const name="WEB_SERVER_PORT" value="1349" />
+        <const name="WEB_SERVER_DOCROOT" value="./tests/htdocs" />
+        <const name="ZIPSTREAMER_TMPFILE_PREFIX" value="zip-streamer-tmptests" />
+    </php>
 </phpunit>
