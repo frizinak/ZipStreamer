@@ -68,33 +68,62 @@ class File {
    */
   protected $fh;
 
-  public function __construct($path, $dest, $deflationLevel = 0, $smooth = 1) {
-    if (is_resource($path)) {
-      $this->fh = $path;
-      $smooth = 1;
-      $path = NULL;
-    }
-    isset($path) && $this->setPath($path);
-    $this->setDest($dest);
+  public function __construct($pathOrResource, $dest, $deflationLevel = 0, $smooth = TRUE) {
     $this->setSmooth($smooth);
+
+    if (empty($dest) || !is_string($dest)) {
+      throw new \InvalidArgumentException('File destination should be a non-empty string');
+    }
+    $this->setDest($dest);
+
+    if (is_resource($pathOrResource)) {
+      $meta = stream_get_meta_data($pathOrResource);
+      if (!isset($meta['mode']) || (!strstr($meta['mode'], 'r') && !strstr($meta['mode'], '+'))) {
+        throw new \InvalidArgumentException('Resource should be readable');
+      }
+      $this->fh = $pathOrResource;
+      $this->setSmooth(TRUE);
+    }
+    else {
+      if (!is_string($pathOrResource) || ($pathOrResource = trim($pathOrResource)) == '') {
+        throw new \InvalidArgumentException('path should be a non-empty string');
+      }
+      $this->setPath($pathOrResource);
+    }
+
     $this->setDeflationLevel($deflationLevel);
-    $this->setRemote(preg_match('/^https?:\/\//', $this->getPath()));
   }
 
   public function genLocal($zipVersion, $dosStamp) {
     $this->prepareLocal();
+
+    $crc = $deflatedSize = $size = 0x0000;
+    $generalPurpose = $compressionMethod = 0x00;
+
+    if ($this->isSmooth()) {
+      $generalPurpose = 0x08;
+    }
+    else {
+      $crc = $this->getCrc();
+      $deflatedSize = $this->getDeflatedSize();
+      $size = $this->getSize();
+    }
+    if ($this->hasDeflation()) {
+      $compressionMethod = 0x08;
+    }
+
     $this->local = pack(
       'VvvvVVVVvv',
-      0x04034b50,                                             // Signature
-      $zipVersion,                                            // Zip extract version
-      $this->isSmooth() ? 0x08 : 0x00,                        // General purpose bit flag
-      $this->hasDeflation() ? 0x08 : 0x00,                    // Compression method
-      $dosStamp,                                              // Modifications time + data
-      $this->isSmooth() ? 0x0000 : $this->getCrc(),           // CRC32
-      $this->isSmooth() ? 0x0000 : $this->getDeflatedSize(),  // Compressed size
-      $this->isSmooth() ? 0x0000 : $this->getSize(),          // Size
-      $this->getDestLength(),                                 // File name/path length (dest)
-      0                                                       // Extra field length
+      0x04034b50,             // Signature
+      $zipVersion,            // Zip extract version
+      $generalPurpose,        // General purpose bit flag
+      $compressionMethod,     // Compression method
+      $dosStamp,              // Modifications time + data
+      $crc,                   // CRC32
+      $deflatedSize,          // Compressed size
+      $size,                  // Size
+      $this->getDestLength(), // File name/path length (dest)
+      0                       // Extra field length
     );
 
     $this->local .= $this->dest;
@@ -102,24 +131,33 @@ class File {
   }
 
   public function genCentral($zipVersion, $dosStamp) {
+    $generalPurpose = 0x00;
+    $compressionMethod = 0x00;
+    if ($this->isSmooth()) {
+      $generalPurpose = 0x08;
+    }
+
+    if ($this->hasDeflation()) {
+      $compressionMethod = 0x08;
+    }
     $this->central = pack(
       'VvvvvVVVVvvvvvVV',
-      0x02014b50,                           // Signature
-      $zipVersion,                          // Zip create version
-      $zipVersion,                          // Zip extract version
-      $this->isSmooth() ? 0x08 : 0x00,      // General purpose bit flag
-      $this->hasDeflation() ? 0x08 : 0x00,  // Compression method
-      $dosStamp,                            // Modifications time + data
-      $this->getCrc(),                      // CRC32
-      $this->getDeflatedSize(),             // Compressed size
-      $this->getSize(),                     // Size
-      $this->getDestLength(),               // File name/path length (dest)
-      0,                                    // Extra field length
-      0,                                    // Comment length
-      0,                                    // Disk number where file starts
-      0,                                    // Internal File attrs
-      32,                                   // External File attrs
-      $this->getLocalOffset()               // Offset of this file
+      0x02014b50,               // Signature
+      $zipVersion,              // Zip create version
+      $zipVersion,              // Zip extract version
+      $generalPurpose,          // General purpose bit flag
+      $compressionMethod,       // Compression method
+      $dosStamp,                // Modifications time + data
+      $this->getCrc(),          // CRC32
+      $this->getDeflatedSize(), // Compressed size
+      $this->getSize(),         // Size
+      $this->getDestLength(),   // File name/path length (dest)
+      0,                        // Extra field length
+      0,                        // Comment length
+      0,                        // Disk number where file starts
+      0,                        // Internal File attrs
+      32,                       // External File attrs
+      $this->getLocalOffset()   // Offset of this file
     );
 
     $this->central .= $this->dest;
@@ -153,11 +191,9 @@ class File {
     // => append data descriptor
     if ($this->isSmooth()) return;
 
-    if (!$this->isRemote()) {
-      $size = filesize($this->path);
-      $this->setSize($size);
-      if (!$this->hasDeflation()) $this->setDeflatedSize($size);
-    }
+    $size = filesize($this->path);
+    $this->setSize($size);
+    if (!$this->hasDeflation()) $this->setDeflatedSize($size);
     $this->setRawCrc(hash_file('crc32b', $this->path, TRUE));
   }
 
@@ -222,13 +258,6 @@ class File {
   }
 
   /**
-   * @param int $size
-   */
-  public function addDeflatedSize($size) {
-    $this->deflatedSize += $size;
-  }
-
-  /**
    * @return string
    */
   public function getDest() {
@@ -289,6 +318,10 @@ class File {
    * @param string $path
    */
   public function setPath($path) {
+    $this->setRemote(preg_match('/^https?:\/\//', $path));
+    if (!$this->isRemote() && !is_readable($path)) {
+      throw new \RuntimeException(sprintf('file %s is not readable', $path));
+    }
     $this->path = trim($path);
   }
 
@@ -332,7 +365,7 @@ class File {
    */
   public function setRemote($remote) {
     $this->remote = $remote;
-    if($remote) $this->setSmooth(true);
+    if ($remote) $this->setSmooth(TRUE);
   }
 
 }

@@ -85,15 +85,6 @@ class ZipStreamer {
    * @throws \RuntimeException when the file does not exist.
    */
   public function add($dest, $pathOrResource, $deflationLevel = 0) {
-    if (is_resource($pathOrResource)) {
-      $meta = stream_get_meta_data($pathOrResource);
-      if (!isset($meta['mode']) || !strstr($meta['mode'], 'r')) {
-        throw new \RuntimeException('Resource should be readable');
-      }
-    }
-    else if (!is_string($pathOrResource)) {
-      throw new \RuntimeException('pathOrResource is neither a string nor a resource');
-    }
     $this->files[] = new File($pathOrResource, preg_replace('/^\/+/', '', $dest), $deflationLevel, $this->continuous);
   }
 
