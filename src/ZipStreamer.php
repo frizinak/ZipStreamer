@@ -49,7 +49,7 @@ class ZipStreamer {
   protected $outputter;
 
   /**
-   * @param OutputInterface $output     The output interface, defaults to \ZipStreamer\Outputs\Http;
+   * @param \ZipStreamer\Outputs\OutputInterface $output     The output interface, defaults to \ZipStreamer\Outputs\Http;
    * @param int             $blockSize  fread size. default 1 MB.
    *                                    - peak mem usage will be around 3x that,
    *                                    - unless the outputter buffers the data it receives.
@@ -60,7 +60,7 @@ class ZipStreamer {
    *                                    -        Adds 1 read to the file before any output has started.
    *
    */
-  public function __construct(OutputInterface $output = NULL, $blockSize = 1048576, $continuous = TRUE) {
+  public function __construct(Outputs\OutputInterface $output = NULL, $blockSize = 1048576, $continuous = TRUE) {
     $this->blockSize = $blockSize;
     $this->continuous = $continuous;
     $this->outputter = isset($output) ? $output : new Http();

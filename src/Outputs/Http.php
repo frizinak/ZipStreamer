@@ -2,6 +2,8 @@
 
 namespace ZipStreamer\Outputs;
 
+use ZipStreamer\Outputs\OutputInterface;
+
 class Http extends Stdout implements OutputInterface {
 
   protected $headersSent = FALSE;

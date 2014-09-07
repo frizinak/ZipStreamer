@@ -2,6 +2,8 @@
 
 namespace ZipStreamer\Outputs;
 
+use ZipStreamer\Outputs\OutputInterface;
+
 class ThrottledHttp extends Http implements OutputInterface {
 
   protected $firstCall = 0;

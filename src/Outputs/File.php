@@ -2,6 +2,8 @@
 
 namespace ZipStreamer\Outputs;
 
+use ZipStreamer\Outputs\OutputInterface;
+
 class File implements OutputInterface {
 
   protected $destination;
