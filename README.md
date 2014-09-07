@@ -10,10 +10,10 @@ foreach($images as $filePath){
 }
 
 foreach($httpTextFiles as $fileUri) {
-  $zip->add('txts/' . basename($file), $fileUri, 9); // Max deflation level.
+  $zip->add('txts/' . basename($fileUri), $fileUri, 9); // Max deflation level.
 }
 
-$fh = fopen('http://google.com', 'rb');
+$fh = fopen('http://www.google.com', 'rb');
 $zip->add('google.html', $fh, -1); // Default zlib delfation level.
 
 $zip->flush(); // Sends any remaining files and finishes streaming the zip.
