@@ -4,4 +4,4 @@ php:
   - "5.4"
 
 install:
-   - composer install --prefer-source --no-dev
+   - composer dump-autoload --no-dev
