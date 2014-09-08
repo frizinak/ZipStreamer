@@ -13,7 +13,7 @@ function time() {
 
 namespace ZipStreamer\Tests;
 
-use ZipStreamer\Outputs\File;
+use ZipStreamer\Output\File;
 use ZipStreamer\ZipStreamer;
 
 class ZipStreamerTest extends \PHPUnit_Framework_TestCase {

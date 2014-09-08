@@ -1,8 +1,6 @@
 <?php
 
-namespace ZipStreamer\Outputs;
-
-use ZipStreamer\Outputs\OutputInterface;
+namespace ZipStreamer\Output;
 
 class File implements OutputInterface {
 

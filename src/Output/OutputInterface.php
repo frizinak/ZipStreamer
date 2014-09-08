@@ -1,5 +1,5 @@
 <?php
-namespace ZipStreamer\Outputs;
+namespace ZipStreamer\Output;
 
 interface OutputInterface {
   public function output($string);
