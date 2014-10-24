@@ -54,8 +54,10 @@ class ZipStreamer {
    *                                    - peak mem usage will be around 3x that,
    *                                    - unless the outputter buffers the data it receives.
    * @param bool            $continuous Only relevant for files that are to be stored (i.e not deflated).
-   *                                    - TRUE: Skip local header crc & sizes but append them to the file (Data descriptor)
-   *                                    -       Results in a smoother stream and less cpu usage, overall slightly slower (I think).
+   *                                    - TRUE: Skip local header crc & sizes but append them to the file
+   *                                    -       (Data descriptor)
+   *                                    -       Results in a smoother stream and less cpu usage,
+   *                                    -       overall slightly slower (I think).
    *                                    - FALSE: Calculate crc before piping the file body.
    *                                    -        Adds 1 read to the file before any output has started.
    *
@@ -78,7 +80,8 @@ class ZipStreamer {
    * @param string          $dest           Destination of the file inside the zip.
    * @param string|resource $pathOrResource Input file path or resource
    * @param int             $deflationLevel The zip deflate level.
-   *                                        -  -1 is zlib default (at the moment of writing: 6 @see http://php.net/manual/en/filters.compression.php)
+   *                                        -  -1 is zlib default (at the moment of writing: 6
+   *                                        -  @see http://php.net/manual/en/filters.compression.php)
    *                                        -  0  no deflation => store
    *                                        -  1 > 9 in increasing compression strength.
    *
@@ -179,7 +182,8 @@ class ZipStreamer {
     // Use tmpfile because php://temp and php://memory seem buggy (read: unusable) when using a stream filter.
     // ... or my memory is corrupt.
     $deflateHandle = tmpfile();
-    $deflationFilter = stream_filter_append($deflateHandle, 'zlib.deflate', STREAM_FILTER_READ, array('level' => $file->getDeflationLevel()));
+    $filterArgs = array('level' => $file->getDeflationLevel());
+    $deflationFilter = stream_filter_append($deflateHandle, 'zlib.deflate', STREAM_FILTER_READ, $filterArgs);
 
     // No output till file has been written :(
     while (TRUE) {

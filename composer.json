@@ -1,5 +1,5 @@
 {
-  "name"       : "klipkens/zip-streamer",
+  "name"       : "frizinak/zip-streamer",
   "description": "Stream zipped data while adding files",
   "license"    : "MIT License",
   "require"    : {
