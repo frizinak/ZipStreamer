@@ -21,3 +21,5 @@ $zip->add('google.html', $fh, -1); // Default zlib delfation level.
 $zip->flush(); // Sends any remaining files and finishes streaming the zip.
 
 ```
+
+License: MIT
